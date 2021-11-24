@@ -6,6 +6,7 @@ automatically tunes parameters of a system to optimize a performance/cost metric
 constraint violation under prescribed budgets.
 
 If you use the repo for your research, we appreciate it that you can cite the paper:
+
 @article{xu2021vabo,
   title={VABO: Violation-Aware Bayesian Optimization for Closed-Loop Control Performance Optimization with Unmodeled Constraints},
   author={Xu, Wenjie and Jones, Colin N and Svetozarevic, Bratislav and Laughman, Christopher R and Chakrabarty, Ankush},
