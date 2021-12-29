@@ -1,6 +1,5 @@
 import numpy as np
 import math
-import os
 import GPy
 import safeopt
 
@@ -10,7 +9,8 @@ generic constrained Bayesian optimization, and our method.
 """
 
 
-def get_config(problem_name, problem_dim=None, gp_kernel=None, init_points_id=0):
+def get_config(problem_name, problem_dim=None, gp_kernel=None,
+               init_points_id=0):
     """
     Input: problem_name
     Output: configuration of the constrained problem, including variable
@@ -38,7 +38,8 @@ def get_config(problem_name, problem_dim=None, gp_kernel=None, init_points_id=0)
         )
 
         def f(x_f):
-            return np.cos(2 * x_f[:, 0]) * np.cos(x_f[:, 1]) + np.sin(x_f[:, 0])
+            return np.cos(2 * x_f[:, 0]) * np.cos(x_f[:, 1]) + \
+                np.sin(x_f[:, 0])
 
         def g_1(x_g1):
             return np.cos(x_g1[:, 0]) * np.cos(x_g1[:, 1]) - \
@@ -74,7 +75,7 @@ def get_config(problem_name, problem_dim=None, gp_kernel=None, init_points_id=0)
     def sample_safe_fun(kernel, config, noise_var, gp_kernel, safe_margin):
         while True:
             fun = safeopt.sample_gp_function(kernel, config['bounds'],
-                                         noise_var, 100)
+                                             noise_var, 100)
             if gp_kernel == 'Gaussian':
                 if fun(0, noise=False) < -safe_margin:
                     break

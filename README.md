@@ -14,6 +14,8 @@ If you use the repo for your research, we appreciate it that you can cite the pa
   year={2021}
 }
 
+## Install
+* Run <code>pip install .</code> in this directory. 
 
 ## Usage
 * The source code is under ./vabo.

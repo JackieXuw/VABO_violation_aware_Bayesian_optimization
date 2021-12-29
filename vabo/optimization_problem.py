@@ -36,7 +36,7 @@ class OptimizationProblem:
         obj_val = obj_val.squeeze()
         feasible = np.array([True] * len(obj_val))
         for i in range(self.num_constrs):
-            feasible = feasible & (constr[:, i] <=0)
+            feasible = feasible & (constr[:, i] <= 0)
 
         minimum = np.min(obj_val[feasible])
         feasible_candidates = self.candidates[feasible, :]
@@ -55,7 +55,8 @@ class OptimizationProblem:
             self.evaluated_constrs_list.append(constraint_val_arr)
             return obj_val, constraint_val_arr
         elif self.problem_name == 'merl_simulator_with_TEvap':
-            obj_val, simulator, TD_is_arr, TEvap_arr = self.obj(x, self.simulator)
+            obj_val, simulator, TD_is_arr, TEvap_arr = self.obj(x,
+                                                                self.simulator)
             self.simulator = simulator
             obj_val = np.expand_dims(obj_val, axis=1)
             constraint_val_arr = np.array(list(zip(TD_is_arr, TEvap_arr)))
@@ -64,6 +65,8 @@ class OptimizationProblem:
             self.evaluated_objs_list.append(obj_val)
             self.evaluated_constrs_list.append(constraint_val_arr)
             return obj_val, constraint_val_arr
+        #if 'simulator' in self.problem_name:
+        #    obj_val, constraint
         else:
             obj_val = self.obj(x)
             obj_val = np.expand_dims(obj_val, axis=1)
