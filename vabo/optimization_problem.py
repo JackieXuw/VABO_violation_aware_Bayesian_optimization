@@ -14,7 +14,10 @@ class OptimizationProblem:
         self.evaluated_constrs_list = []
         self.problem_name = config['problem_name']
 
-        if 'simulator' in self.problem_name:
+        # if obj and constr are evaluated simultaneously using a simulator
+        self.eval_simu = config['eval_simu']
+
+        if self.eval_simu:
             self.simulator = None
 
         self.var_dim = config['var_dim']
@@ -44,29 +47,9 @@ class OptimizationProblem:
         return minimum, minimizer
 
     def sample_point(self, x):
-        if self.problem_name == 'merl_simulator':
-            obj_val, simulator, TD_is_arr = self.obj(x, self.simulator)
-            self.simulator = simulator
-            obj_val = np.expand_dims(obj_val, axis=1)
-            constraint_val_arr = np.expand_dims(TD_is_arr, axis=1)
-
-            self.evaluated_points_list.append(x)
-            self.evaluated_objs_list.append(obj_val)
-            self.evaluated_constrs_list.append(constraint_val_arr)
-            return obj_val, constraint_val_arr
-        elif self.problem_name == 'merl_simulator_with_TEvap':
-            obj_val, simulator, TD_is_arr, TEvap_arr = self.obj(x,
-                                                                self.simulator)
-            self.simulator = simulator
-            obj_val = np.expand_dims(obj_val, axis=1)
-            constraint_val_arr = np.array(list(zip(TD_is_arr, TEvap_arr)))
-
-            self.evaluated_points_list.append(x)
-            self.evaluated_objs_list.append(obj_val)
-            self.evaluated_constrs_list.append(constraint_val_arr)
-            return obj_val, constraint_val_arr
-        #if 'simulator' in self.problem_name:
-        #    obj_val, constraint
+        if self.eval_simu:
+            obj_val, constraint_val_arr, simulator = self.obj(x,
+                                                              self.simulator)
         else:
             obj_val = self.obj(x)
             obj_val = np.expand_dims(obj_val, axis=1)
@@ -75,10 +58,10 @@ class OptimizationProblem:
                 constraint_val_list.append(g(x))
             constraint_val_arr = np.array(constraint_val_list).T
 
-            self.evaluated_points_list.append(x)
-            self.evaluated_objs_list.append(obj_val)
-            self.evaluated_constrs_list.append(constraint_val_arr)
-            return obj_val, constraint_val_arr
+        self.evaluated_points_list.append(x)
+        self.evaluated_objs_list.append(obj_val)
+        self.evaluated_constrs_list.append(constraint_val_arr)
+        return obj_val, constraint_val_arr
 
     def get_total_violation_cost(self, constraint_val_arr):
         constrs_vio_cost_list = []
