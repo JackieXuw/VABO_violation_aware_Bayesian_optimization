@@ -50,6 +50,7 @@ class OptimizationProblem:
         if self.eval_simu:
             obj_val, constraint_val_arr, simulator = self.obj(x,
                                                               self.simulator)
+            self.simulator = simulator
         else:
             obj_val = self.obj(x)
             obj_val = np.expand_dims(obj_val, axis=1)
@@ -57,7 +58,8 @@ class OptimizationProblem:
             for g in self.constrs_list:
                 constraint_val_list.append(g(x))
             constraint_val_arr = np.array(constraint_val_list).T
-
+        if obj_val.ndim < 2:
+            obj_val = np.expand_dims(obj_val, axis=1)
         self.evaluated_points_list.append(x)
         self.evaluated_objs_list.append(obj_val)
         self.evaluated_constrs_list.append(constraint_val_arr)

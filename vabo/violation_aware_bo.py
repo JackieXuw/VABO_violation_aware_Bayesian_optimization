@@ -2,11 +2,7 @@
 Implement violation-aware Bayesian optimizer.
 """
 import numpy as np
-import safeopt
-import GPy
-import torch
-import gpytorch
-from .base_optimizer import *
+from .base_optimizer import BaseBO
 from scipy.stats import norm
 
 
@@ -26,10 +22,14 @@ class ViolationAwareBO(BaseBO):
         self.total_vio_budgets = violation_aware_BO_config['total_vio_budgets']
         self.prob_eps = violation_aware_BO_config['prob_eps']
         self.beta_0 = violation_aware_BO_config['beta_0']
-        self.total_eval_num = violation_aware_BO_config['eval_budget']
+        self.total_eval_num = violation_aware_BO_config['total_eval_num']
 
         self.curr_budgets = self.total_vio_budgets
         self.curr_eval_budget = self.total_eval_num
+        self.single_step_budget = violation_aware_BO_config[
+               'single_max_budget']
+
+        self.cumu_vio_cost = np.zeros(self.opt_problem.num_constrs)
         self.S = None
 
     def get_acquisition(self):
@@ -67,12 +67,11 @@ class ViolationAwareBO(BaseBO):
                                           constrain_var_arr)
         prob_all_not_use_up_budget = np.prod(prob_not_use_up_budget, axis=1)
 
-
         EIc_indicated = EIc * (prob_all_not_use_up_budget >=
-                                   1 - self.prob_eps)
+                               1 - self.prob_eps)
 
         self.S = self.parameter_set[(prob_all_not_use_up_budget >=
-                                   1 - self.prob_eps)]
+                                     1 - self.prob_eps)]
         return EIc_indicated
 
     def get_beta(self):
@@ -88,6 +87,10 @@ class ViolationAwareBO(BaseBO):
     def make_step(self, update_gp=False, gp_package='gpy'):
         x_next, y_obj, constr_vals, vio_cost = self.step_sample_point()
         vio_cost = np.squeeze(vio_cost)
-        self.curr_budgets -= vio_cost
+        self.cumu_vio_cost = self.cumu_vio_cost + vio_cost
+        self.curr_budgets = np.minimum(
+            np.maximum(self.total_vio_budgets - self.cumu_vio_cost, 0),
+            self.single_step_budget
+        )
         self.curr_eval_budget -= 1
         return y_obj, constr_vals

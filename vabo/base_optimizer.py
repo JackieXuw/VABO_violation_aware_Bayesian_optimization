@@ -4,7 +4,6 @@ Implement optimizer base class.
 import numpy as np
 import safeopt
 import GPy
-from scipy.stats import norm
 
 
 def get_abs_noise_level(func_arr, noise_fraction):
@@ -22,6 +21,7 @@ class BaseBO:
             self.normalize_input = base_config['normalize_input']
         else:
             self.normalize_input = True
+
         self.opt_problem = opt_problem
         self.noise_level = base_config['noise_level']
 
@@ -49,6 +49,7 @@ class BaseBO:
         self.query_points_list = []
         self.query_points_obj = []
         self.query_points_constrs = []
+
         if 'kernel' in self.opt_problem.config.keys():
             self.kernel_list = self.opt_problem.config['kernel']
         elif 'kernel_type' in base_config.keys():
@@ -60,6 +61,9 @@ class BaseBO:
         init_obj_val_arr, init_constr_val_arr = \
             self.get_obj_constr_val(self.x0_arr)
         self.best_obj = np.min(init_obj_val_arr)
+        init_obj_val_arr_1d = np.squeeze(init_obj_val_arr)
+        best_sol_id = np.argmin(init_obj_val_arr_1d)
+        self.best_sol = self.x0_arr[best_sol_id, :]
 
         if reverse_meas:
             init_obj_val_arr = - init_obj_val_arr
@@ -69,10 +73,15 @@ class BaseBO:
             self.gp_obj_mean = np.mean(init_obj_val_arr)
         else:
             self.gp_obj_mean = 0.0
-        self.gp_obj = GPy.models.GPRegression(self.x0_arr,
-                                              init_obj_val_arr-self.gp_obj_mean,
-                                              self.kernel_list[0],
-                                              noise_var=self.noise_level ** 2)
+
+        if init_obj_val_arr.ndim == 1:
+            init_obj_val_arr = np.expand_dims(init_obj_val_arr, axis=1)
+        self.gp_obj = GPy.models.GPRegression(
+            self.x0_arr,
+            init_obj_val_arr - self.gp_obj_mean,
+            self.kernel_list[0],
+            noise_var=self.noise_level ** 2
+        )
 
         self.gp_constr_list = []
         self.gp_constr_mean_list = []
@@ -84,7 +93,8 @@ class BaseBO:
             self.gp_constr_list.append(
                 GPy.models.GPRegression(self.x0_arr,
                                         np.expand_dims(
-                                            init_constr_val_arr[:, i], axis=1) - gp_constr_mean,
+                                            init_constr_val_arr[:, i], axis=1)
+                                        - gp_constr_mean,
                                         self.kernel_list[i + 1],
                                         noise_var=self.noise_level ** 2))
             self.gp_constr_mean_list.append(gp_constr_mean)
@@ -108,7 +118,9 @@ class BaseBO:
         for i in range(self.opt_problem.num_constrs):
             constr_obj = np.expand_dims(self.opt_problem.train_constr[:, i],
                                         axis=1)
-            constr_noise_level = get_abs_noise_level(constr_obj, noise_fraction)
+            constr_noise_level = get_abs_noise_level(
+                constr_obj, noise_fraction
+            )
             constr_noise_level_list.append(constr_noise_level)
         return obj_noise_level, constr_noise_level_list
 
@@ -174,12 +186,15 @@ class BaseBO:
         x_next = self.optimize()
         if np.ndim(x_next) == 1:
             x_next = np.array([x_next])
-        # Get a measurement from the real world system
+        # Get a measurement of objective and constraints
         y_obj, constr_vals = self.get_obj_constr_val(x_next)
 
         if np.all(constr_vals <= 0):
-            # update best objective if we get a feasible point
+            # update best solution and objective if we get a feasible point
+            if self.y_obj[0, 0] < self.best_obj:
+                self.best_sol = x_next
             self.best_obj = np.min([y_obj[0, 0], self.best_obj])
+
         # tracking violation cost
         self.query_points_list.append(x_next)
         self.query_points_obj.append(y_obj)
@@ -193,14 +208,14 @@ class BaseBO:
             y_obj = - y_obj
             constr_vals = - constr_vals
 
-        y_meas = np.hstack((y_obj, constr_vals))
-
         # Add this to the GP model
         prev_X = self.opt.gps[0].X
         prev_obj = self.opt.gps[0].Y + self.gp_obj_mean
         prev_constr_list = []
         for i in range(self.opt_problem.num_constrs):
-            prev_constr_list.append(self.opt.gps[i + 1].Y + self.gp_constr_mean_list[i])
+            prev_constr_list.append(
+                self.opt.gps[i + 1].Y + self.gp_constr_mean_list[i]
+            )
 
         new_X = np.vstack([prev_X, x_next])
         new_obj = np.vstack([prev_obj, y_obj])
@@ -212,7 +227,10 @@ class BaseBO:
             self.opt.gps[0].optimize()
 
         for i in range(self.opt_problem.num_constrs):
-            new_constr = np.vstack([prev_constr_list[i], np.expand_dims(constr_vals[:, i], axis=1)])
+            new_constr = np.vstack(
+                [prev_constr_list[i],
+                 np.expand_dims(constr_vals[:, i], axis=1)]
+            )
             if update_hyperparams:
                 self.gp_constr_mean_list[i] = np.mean(new_constr)
             new_constr = new_constr - self.gp_constr_mean_list[i]
