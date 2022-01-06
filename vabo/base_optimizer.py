@@ -191,7 +191,7 @@ class BaseBO:
 
         if np.all(constr_vals <= 0):
             # update best solution and objective if we get a feasible point
-            if self.y_obj[0, 0] < self.best_obj:
+            if y_obj[0, 0] < self.best_obj:
                 self.best_sol = x_next
             self.best_obj = np.min([y_obj[0, 0], self.best_obj])
 

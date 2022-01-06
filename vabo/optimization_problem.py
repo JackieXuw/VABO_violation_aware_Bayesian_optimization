@@ -1,5 +1,8 @@
 import numpy as np
+import GPy
 import safeopt
+import copy
+from matplotlib import pyplot as plt
 """
 Define and implement the class of optimization problem.
 """
@@ -12,6 +15,10 @@ class OptimizationProblem:
         self.evaluated_points_list = []
         self.evaluated_objs_list = []
         self.evaluated_constrs_list = []
+        self.evaluated_feasible_points_list = []
+        self.evaluated_feasible_objs_list = []
+        self.evaluated_feasible_constrs_list = []
+
         self.problem_name = config['problem_name']
 
         # if obj and constr are evaluated simultaneously using a simulator
@@ -63,6 +70,11 @@ class OptimizationProblem:
         self.evaluated_points_list.append(x)
         self.evaluated_objs_list.append(obj_val)
         self.evaluated_constrs_list.append(constraint_val_arr)
+
+        if np.all(constraint_val_arr <= 0):
+            self.evaluated_feasible_points_list.append(x)
+            self.evaluated_feasible_objs_list.append(obj_val)
+            self.evaluated_feasible_constrs_list.append(constraint_val_arr)
         return obj_val, constraint_val_arr
 
     def get_total_violation_cost(self, constraint_val_arr):
@@ -80,3 +92,66 @@ class OptimizationProblem:
             c_inv = self.vio_cost_funcs_inv_list[i](cost_budget[i])
             allowed_vio[0, i] = c_inv
         return allowed_vio
+
+    def get_1d_kernel_params(self, X, Y, kernel='Gaussian'):
+        if kernel == 'Gaussian':
+            kernel = GPy.kern.RBF(input_dim=1,
+                                  variance=1.0,
+                                  lengthscale=5.0,
+                                  )
+            gp = GPy.models.GPRegression(
+                                    np.expand_dims(X, axis=-1),
+                                    np.expand_dims(Y, axis=-1),
+                                    kernel
+                            )
+            gp.optimize()
+        return gp.parameters
+
+    def parameter_estimation(self, kernel='Gaussian', display=False):
+        # dimension-wise parameter estimation
+        var_dim = self.var_dim
+        medium_input = [(self.bounds[i][0] + self.bounds[i][1]) * 0.5
+                        for i in range(self.var_dim)]
+        parameters_list = [[] for i in range(self.num_constrs+1)]
+        for dim_i in range(var_dim):
+            train_X_list = []
+            train_objY_list = []
+            train_constrY_list = [[] for i in range(self.num_constrs)]
+            for k in range(self.discretize_num_list[dim_i]+1):
+                # set X_i to the k-th value while setting others middle value
+                X = medium_input
+                X[dim_i] = self.bounds[dim_i][0] + \
+                    (k/self.discretize_num_list[dim_i]) * \
+                    (self.bounds[dim_i][1] - self.bounds[dim_i][0])
+                objY, constrYs = self.sample_point(np.array([X]),
+                                                   reset_init=True)
+                train_X_list.append(copy.deepcopy(X))
+                train_objY_list.append(objY)
+                for m in range(self.num_constrs):
+                    train_constrY_list[m].append(constrYs[m, :])
+
+            train_X = np.array(train_X_list)
+            train_objY = np.array(train_objY_list)
+            train_constrY = np.array(train_constrY_list)
+            if display:
+                plt.figure()
+                plt.plot(train_X[:, dim_i], train_objY[:, 0, 0])
+                print(train_X[:, dim_i], train_objY[:, 0, 0])
+                plt.title(str(dim_i))
+            parameters_list[0].append(
+                self.get_1d_kernel_params(
+                    train_X[:, dim_i], train_objY[:, 0, 0], kernel
+                )
+            )
+            for i in range(self.num_constrs):
+                parameters_list[i+1].append(
+                    self.get_1d_kernel_params(train_X[:, dim_i],
+                                              train_constrY[i, :, 0], kernel)
+                )
+
+                if display:
+                    plt.figure()
+                    plt.plot(train_X[:, dim_i], train_constrY[i, :, 0])
+                    print(train_X[:, dim_i], train_constrY[i, :, 0])
+                    plt.title(str(dim_i))
+        return parameters_list
