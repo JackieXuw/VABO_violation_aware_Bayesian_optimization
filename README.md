@@ -15,6 +15,7 @@ If you use the repo for your research, we appreciate it that you can cite the pa
 }
 
 ## Install
+* <code>git clone https://github.com/JackieXuw/VABO_violation_aware_Bayesian_optimization.git </code>
 * Run <code>pip install .</code> in this directory. 
 
 ## Usage

@@ -137,46 +137,23 @@ class OptimizationProblem:
             train_constrY = np.array(train_constrY_list)
             if display:
                 plt.figure()
-                plt.plot(train_X[:, dim_i], train_objY[:, 0, 0])
-                print(train_X[:, dim_i], train_objY[:, 0, 0])
+                plt.plot(train_X[:, dim_i], train_objY[:, 0])
+                print(train_X[:, dim_i], train_objY[:, 0])
                 plt.title(str(dim_i))
             parameters_list[0].append(
                 self.get_1d_kernel_params(
-                    train_X[:, dim_i], train_objY[:, 0, 0], kernel
+                    train_X[:, dim_i], train_objY[:, 0], kernel
                 )
             )
             for i in range(self.num_constrs):
-                if display:
-                    plt.figure()
-                    plt.plot(train_X[:, dim_i], train_constrY[i, :, 0])
-                    print(train_X[:, dim_i], train_constrY[i, :, 0])
-                    plt.title(str(dim_i))
-
                 parameters_list[i+1].append(
                     self.get_1d_kernel_params(train_X[:, dim_i],
-                                              train_constrY[i, :, 0], kernel)
+                                              train_constrY[i, :], kernel)
                 )
 
-        # Now estimate the noise level and prior mean
-        sample_size = 50
-        train_objY_list = []
-        train_constrY_list = [[] for i in range(self.num_constrs)]
-        for k in range(sample_size):
-            if k == 0:
-                objY, constrYs = self.sample_point(np.array([medium_input]),
-                                                   reset_init=True)
-            else:
-                objY, constrYs = self.sample_point(np.array([medium_input]),
-                                                   reset_init=False)
-            train_objY_list.append(objY)
-            for m in range(self.num_constrs):
-                train_constrY_list[m].append(constrYs[:, m])
-        train_objY = np.array(train_objY_list)
-        train_constrY = np.array(train_constrY_list)
-        self.simulator = None
-        obj_mean = np.mean(train_objY, axis=0)
-        obj_std = np.std(train_objY, axis=0)
-        constr_mean = np.mean(train_constrY, axis=1)
-        constr_std = np.std(train_constrY, axis=1)
-        parameters_list.append([obj_mean, obj_std, constr_mean, constr_std])
+                if display:
+                    plt.figure()
+                    plt.plot(train_X[:, dim_i], train_constrY[i, :])
+                    print(train_X[:, dim_i], train_constrY[i, :])
+                    plt.title(str(dim_i))
         return parameters_list
