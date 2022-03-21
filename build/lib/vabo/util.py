@@ -234,8 +234,6 @@ def get_config(problem_name, problem_dim=None, gp_kernel=None,
         config['init_safe_points'] = x0
         config['kernel'] = [kernel, kernel.copy()]
 
-
-
     return config
 
 
