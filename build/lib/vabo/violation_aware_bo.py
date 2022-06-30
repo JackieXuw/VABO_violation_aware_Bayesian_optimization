@@ -18,6 +18,12 @@ class ViolationAwareBO(BaseBO):
         else:
             self.beta_func = lambda t: 1
 
+        if 'lcb_coef' in violation_aware_BO_config.keys():
+            self.lcb_coef = violation_aware_BO_config['lcb_coef']
+        else:
+            self.lcb_coef = lambda t: 3
+
+        self.INF = 1e10
         self.num_eps = 1e-10   # epsilon for numerical value
         self.total_vio_budgets = violation_aware_BO_config['total_vio_budgets']
         self.prob_eps = violation_aware_BO_config['prob_eps']
@@ -28,11 +34,14 @@ class ViolationAwareBO(BaseBO):
         self.curr_eval_budget = self.total_eval_num
         self.single_step_budget = violation_aware_BO_config[
                'single_max_budget']
-
+        if 'acq_func_type' not in violation_aware_BO_config.keys():
+            self.acq_func_type = 'CEI'  # default acquistion function type
+        else:
+            self.acq_func_type = 'LCB'
         self.cumu_vio_cost = np.zeros(self.opt_problem.num_constrs)
         self.S = None
 
-    def get_acquisition(self, prob_eps=None):
+    def get_acquisition(self, prob_eps=None, acq_func_type='CEI'):
         if prob_eps is None:
             prob_eps = self.prob_eps
         obj_mean, obj_var = self.gp_obj.predict(self.parameter_set)
@@ -61,6 +70,12 @@ class ViolationAwareBO(BaseBO):
         EI = (f_min - obj_mean) * norm.cdf(z) + np.sqrt(obj_var) * norm.pdf(z)
         EIc = prob_feasible * EI
 
+        # calculate LCB
+        trunc_obj_sd = np.maximum(np.sqrt(obj_var), self.num_eps)
+        lcb_coef = self.lcb_coef(
+            self.total_eval_num - self.curr_eval_budget)
+        lcb = obj_mean - lcb_coef * trunc_obj_sd
+
         # calculate Pr(c_i([g_i(x)]^+)<=B_{i,t} * beta_{i, t})
         curr_beta = self.get_beta()
         curr_cost_allocated = self.curr_budgets * curr_beta
@@ -69,29 +84,46 @@ class ViolationAwareBO(BaseBO):
                                           constrain_var_arr)
         prob_all_not_use_up_budget = np.prod(prob_not_use_up_budget, axis=1)
 
-        EIc_indicated = EIc * (prob_all_not_use_up_budget >=
-                               1 - prob_eps)
-
+        feasible = (prob_all_not_use_up_budget >= 1 - prob_eps)
+        EIc_indicated = EIc * feasible
         self.S = self.parameter_set[(prob_all_not_use_up_budget >=
                                      1 - prob_eps)]
-        return EIc_indicated
+
+        # for LCB, we are minimizing, set objetive to be lcb * 1_feasible +
+        # INF * (1 - 1_feasible)
+        lcb_indicated = lcb * feasible + self.INF * (1-feasible)
+
+        if acq_func_type == 'CEI':
+            obj_indicated = EIc_indicated
+        elif acq_func_type == 'LCB':
+            obj_indicated = lcb_indicated
+        return obj_indicated
 
     def get_beta(self):
         return min(max(0, self.beta_func(self.curr_eval_budget)), 1.0)
 
     def optimize(self):
+        acq_func_type = self.acq_func_type
         prob_eps = self.prob_eps
         eps_multi = 1.1
         is_any_acq_postive = False
-        while not is_any_acq_postive:
-            acq = self.get_acquisition(prob_eps=prob_eps)
-            if np.any(acq > 0):
-                is_any_acq_postive = True
-            else:
-                print('Can not find not use up budget point, increase risk \
-                      level.')
-                prob_eps = prob_eps * eps_multi
-        next_point_id = np.argmax(acq)
+        if acq_func_type == 'CEI':
+            while not is_any_acq_postive:
+                acq = self.get_acquisition(prob_eps=prob_eps)
+                if np.any(acq > 0):
+                    is_any_acq_postive = True
+                else:
+                    print('Can not find not use up budget point, increase ' +
+                          'risk level.')
+                    prob_eps = prob_eps * eps_multi
+            next_point_id = np.argmax(acq)
+        elif acq_func_type == 'LCB':
+            acq = self.get_acquisition(
+                prob_eps=prob_eps, acq_func_type=acq_func_type)
+            next_point_id = np.argmin(acq)
+        else:
+            raise Exception(f'{acq_func_type} acquistion not supported!')
+
         next_point = self.parameter_set[next_point_id]
         return next_point
 
