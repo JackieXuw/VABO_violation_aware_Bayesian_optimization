@@ -48,6 +48,6 @@ class ConstrainedBO(BaseBO):
         next_point = self.parameter_set[next_point_id]
         return next_point
 
-    def make_step(self):
+    def make_step(self, update_gp=False):
         x_next, y_obj, constr_vals, vio_cost = self.step_sample_point()
         return y_obj, constr_vals

@@ -188,7 +188,11 @@ class BaseBO:
         raise NotImplementedError
 
     def step_sample_point(self, update_hyperparams=False, reverse_meas=False):
-        x_next = self.optimize()
+        try:
+            x_next = self.optimize()
+        except Exception as e:
+            print(f'Exception {e}.')
+            x_next = self.x0_arr[0, :]
         if np.ndim(x_next) == 1:
             x_next = np.array([x_next])
         # Get a measurement of objective and constraints
@@ -205,7 +209,9 @@ class BaseBO:
         self.query_points_obj.append(y_obj)
         self.query_points_constrs.append(constr_vals)
 
+        print(constr_vals)
         vio_cost = self.opt_problem.get_total_violation_cost(constr_vals)
+        print(vio_cost)
         violation_total_cost = np.sum(vio_cost, axis=0)
         self.cumu_vio_cost = self.cumu_vio_cost + violation_total_cost
 

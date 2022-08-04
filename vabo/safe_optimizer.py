@@ -25,7 +25,7 @@ class SafeBO(BaseBO):
 
         return x_next
 
-    def make_step(self):
+    def make_step(self, update_gp=False):
         x_next, y_obj, constr_vals, vio_cost = self.step_sample_point(
             reverse_meas=True
         )
