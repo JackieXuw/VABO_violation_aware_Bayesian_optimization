@@ -24,7 +24,7 @@ If you use the repo for your research, we appreciate it that you can cite the pa
 * To construct an optimization problem. You need to provide a config dictionary
     to initialize an object of the class `vabo.optimization_problem.OptimizationProblem`. 
   * For example.
-    * ```
+    ```python
     config = {
     'problem_name': 'my_problem',   # the name of your problem
     'var_dim': 5,   # the dimension of input variables
